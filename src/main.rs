@@ -9,7 +9,7 @@ use tracing::{info, Level};
 use tracing_error::ErrorLayer;
 use tracing_subscriber::{prelude::*, util::SubscriberInitExt, EnvFilter, Registry};
 
-use crate::pay2wash::model::influx::InfluxMachineStatus;
+use crate::pay2wash::model::{influx::InfluxMachineStatus, MachineStatus};
 
 mod pay2wash;
 mod strict_types;
@@ -104,9 +104,9 @@ async fn async_main(environment: Environment) -> color_eyre::Result<()> {
         .await
         .wrap_err("failed to get machine statuses")?;
 
-    // for (name, MachineStatus { state, .. }) in statuses {
-    //     dbg!((name, state));
-    // }
+    for (name, MachineStatus { state, .. }) in statuses.iter() {
+        dbg!((name, state));
+    }
 
     dbg!(
         db.query(

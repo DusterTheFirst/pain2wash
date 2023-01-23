@@ -2,6 +2,10 @@ app = "pain2wash-influx"
 kill_signal = "SIGINT"
 kill_timeout = 5
 
+[mounts]
+source="influx_data"
+destination="/var/lib/influxdb2"
+
 [env]
 
 [[services]]

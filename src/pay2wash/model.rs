@@ -37,13 +37,10 @@ pub mod influx {
         pub machine_name: &'str str,
         #[influxdb(tag)]
         pub location: &'str str,
-        #[influxdb(tag)]
         pub running: bool,
         pub starter: UserId,
-        #[influxdb(tag)]
         pub reserved: bool,
         pub reserver: UserId,
-        #[influxdb(tag)]
         pub in_maintenance: NumberBool,
         pub remaining_time: RemainingTime,
         pub gateway_offline: NumberBool,
@@ -115,7 +112,7 @@ pub enum MachineState {
 pub enum FromMachineStatusError {
     #[error("attempted to interpret in_maintenance and received an unknown value: {0}")]
     UnknownNumberBool(u8),
-    #[error("only one of the following should be true at once: running ({running}), reserved ({running}), in_maintenance ({running})")]
+    #[error("invariant does not hold: running ({running}) reserved ({running}), in_maintenance ({in_maintenance:?})")]
     BadInvariant {
         running: bool,
         reserved: bool,
@@ -128,7 +125,7 @@ impl TryFrom<&JsonMachineStatus> for MachineState {
 
     fn try_from(status: &JsonMachineStatus) -> Result<Self, Self::Error> {
         match (status.running, status.reserved, status.in_maintenance) {
-            (true, false, NumberBool::False) => Ok(Self::Running {
+            (true, _, NumberBool::False) => Ok(Self::Running {
                 starter: status.starter,
                 remaining_time: status.remaining_time,
                 remaining_time_is_from_machine: status.remaining_time_is_from_machine,
