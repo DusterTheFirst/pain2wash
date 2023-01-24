@@ -6,6 +6,7 @@ use thiserror::Error;
 
 use std::{
     fmt::{self, Debug},
+    str::FromStr,
     time::Duration,
 };
 
@@ -21,71 +22,6 @@ pub struct JsonMachineStatus {
     pub remaining_time_is_from_machine: NumberBool,
     // Unknown
     pub controller_logic: u32,
-}
-
-pub mod influx {
-    use std::time::SystemTime;
-
-    use influxdb::{InfluxDbWriteable, Timestamp};
-
-    use super::{JsonMachineStatus, NumberBool, RemainingTime, UserId};
-
-    #[derive(Debug, InfluxDbWriteable)]
-    pub struct InfluxMachineStatus<'str> {
-        pub time: Timestamp,
-        #[influxdb(tag)]
-        pub machine_name: &'str str,
-        #[influxdb(tag)]
-        pub location: &'str str,
-        pub running: bool,
-        pub starter: UserId,
-        pub reserved: bool,
-        pub reserver: UserId,
-        pub in_maintenance: NumberBool,
-        pub remaining_time: RemainingTime,
-        pub gateway_offline: NumberBool,
-        pub remaining_time_is_from_machine: NumberBool,
-        // Unknown
-        pub controller_logic: u32,
-    }
-
-    impl<'s> InfluxMachineStatus<'s> {
-        pub fn new(
-            JsonMachineStatus {
-                running,
-                starter,
-                reserved,
-                reserver,
-                in_maintenance,
-                remaining_time,
-                gateway_offline,
-                remaining_time_is_from_machine,
-                controller_logic,
-            }: JsonMachineStatus,
-            machine_name: &'s str,
-            location: &'s str,
-        ) -> Self {
-            Self {
-                time: Timestamp::Milliseconds(
-                    SystemTime::now()
-                        .duration_since(SystemTime::UNIX_EPOCH)
-                        .expect("Time has moved backwards")
-                        .as_millis(),
-                ),
-                machine_name,
-                location,
-                running,
-                starter,
-                reserved,
-                reserver,
-                in_maintenance,
-                remaining_time,
-                gateway_offline,
-                remaining_time_is_from_machine,
-                controller_logic,
-            }
-        }
-    }
 }
 
 #[derive(Debug)]
@@ -151,9 +87,17 @@ impl TryFrom<&JsonMachineStatus> for MachineState {
 #[serde(transparent)]
 pub struct UserId(u32);
 
-impl From<UserId> for influxdb::Type {
+impl FromStr for UserId {
+    type Err = <u32 as FromStr>::Err;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        u32::from_str(s).map(Self)
+    }
+}
+
+impl From<UserId> for u32 {
     fn from(value: UserId) -> Self {
-        influxdb::Type::UnsignedInteger(value.0.into())
+        value.0
     }
 }
 
@@ -162,12 +106,6 @@ pub enum NumberBool {
     False,
     True,
     Unknown(u8),
-}
-
-impl From<NumberBool> for influxdb::Type {
-    fn from(value: NumberBool) -> Self {
-        influxdb::Type::UnsignedInteger(u8::from(value).into())
-    }
 }
 
 impl From<u8> for NumberBool {
@@ -260,12 +198,6 @@ impl<'de> Deserialize<'de> for NumberBool {
 
 #[derive(Debug, Clone, Copy)]
 pub struct RemainingTime(Duration);
-
-impl From<RemainingTime> for influxdb::Type {
-    fn from(value: RemainingTime) -> Self {
-        influxdb::Type::UnsignedInteger(value.0.as_secs())
-    }
-}
 
 impl RemainingTime {
     pub fn into_inner(self) -> Duration {

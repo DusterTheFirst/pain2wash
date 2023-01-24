@@ -9,11 +9,14 @@ use serde::Serialize;
 use thiserror::Error;
 use tracing::{info, trace};
 
-use std::{collections::HashMap, fmt::Debug};
+use std::{
+    collections::HashMap,
+    fmt::{self, Debug},
+};
 
-use crate::strict_types::{Email, Password};
+use crate::strict_types::{Email, Password, PasswordRef};
 
-use self::model::{JsonMachineStatus, MachineState, MachineStatus};
+use self::model::{JsonMachineStatus, MachineState, MachineStatus, UserId};
 
 pub mod model;
 
@@ -40,8 +43,10 @@ pub enum AuthenticatedSessionError {
     Other(#[from] color_eyre::Report),
 }
 
+const LOGIN_PAGE: &str = "https://holland2stay.pay2wash.app/login";
+
 impl Pay2WashClient {
-    pub(crate) fn new(email: Email, password: Password) -> Self {
+    pub fn new(email: Email, password: Password) -> Self {
         Self {
             email,
             password,
@@ -69,9 +74,7 @@ impl Pay2WashClient {
     }
 
     #[tracing::instrument]
-    pub(crate) async fn authenticate(&self) -> color_eyre::Result<AuthenticatedSession> {
-        pub(crate) const LOGIN_PAGE: &str = "https://holland2stay.pay2wash.app/login";
-
+    pub async fn authenticate(&self) -> color_eyre::Result<AuthenticatedSession> {
         trace!(LOGIN_PAGE, "fetching login form for CSRF token");
 
         let response = self
@@ -100,7 +103,7 @@ impl Pay2WashClient {
 
         trace!("extracted session information from login form");
 
-        let session = match session {
+        let unauthenticated_session = match session {
             Pay2WashSession::Authenticated(session) => {
                 info!("attempted to authenticate while in an authenticated session");
 
@@ -109,11 +112,19 @@ impl Pay2WashClient {
             Pay2WashSession::Unauthenticated(session) => session,
         };
 
-        #[derive(Debug, Serialize)]
-        pub(crate) struct LoginForm<'s> {
+        self.authenticate_from_unauthenticated_session(unauthenticated_session)
+            .await
+    }
+
+    pub async fn authenticate_from_unauthenticated_session(
+        &self,
+        session: UnauthenticatedSession,
+    ) -> color_eyre::Result<AuthenticatedSession> {
+        #[derive(Serialize, Debug)]
+        struct LoginForm<'s> {
             _token: &'s str,
             email: &'s str,
-            password: &'s str,
+            password: PasswordRef<'s>
         }
 
         let login_form = LoginForm {
@@ -122,7 +133,7 @@ impl Pay2WashClient {
             password: self.password.as_ref(),
         };
 
-        trace!(?login_form, "submitting login form");
+        trace!(?login_form, LOGIN_PAGE, "submitting login form");
 
         let response = self
             .http_client
@@ -160,7 +171,7 @@ impl Pay2WashClient {
     }
 
     #[tracing::instrument]
-    pub(crate) async fn get_machine_statuses<'session>(
+    pub async fn get_machine_statuses<'session>(
         &self,
         session: &'session AuthenticatedSession,
     ) -> Result<HashMap<&'session str, MachineStatus>, AuthenticatedSessionError> {
@@ -226,7 +237,7 @@ pub struct UnauthenticatedSession {
 #[derive(Debug)]
 pub struct AuthenticatedSession {
     pub csrf_token: String,
-    pub user_token: String,
+    pub user_token: UserId,
     pub location: String,
     pub machine_mappings: HashMap<String, String>,
 }
@@ -339,7 +350,9 @@ pub(crate) fn extract_session(html: Html) -> color_eyre::Result<Pay2WashSession>
 
         Ok(Pay2WashSession::Authenticated(AuthenticatedSession {
             csrf_token,
-            user_token: user_token.to_owned(),
+            user_token: user_token
+                .parse()
+                .wrap_err("user_token was a non-integer")?,
             location: location.to_owned(),
             machine_mappings,
         }))

@@ -1,0 +1,8 @@
+disallowed-types = [
+    # Fly.io possible limitations
+    { path = "prometheus_client::metrics::exemplar::CounterWithExemplar", reason = "fly.io might not support this metric type" },
+    { path = "prometheus_client::metrics::exemplar::Exemplar", reason = "fly.io might not support this metric type" },
+    { path = "prometheus_client::metrics::exemplar::HistogramWithExemplars", reason = "fly.io might not support this metric type" },
+    # Fly.io known limitations
+    { path = "prometheus_client::metrics::info::Info", reason = "fly.io does not support this metric type, use GaugeInfo as a workaround" },
+]
