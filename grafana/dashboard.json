@@ -2103,7 +2103,7 @@
         "type": "timeseries"
       }
     ],
-    "refresh": "10s",
+    "refresh": "1m",
     "schemaVersion": 37,
     "style": "dark",
     "tags": [],
@@ -2147,6 +2147,6 @@
     "timezone": "",
     "title": "Pay2Wash Monitoring",
     "uid": "UATBqfoVk",
-    "version": 20,
+    "version": 21,
     "weekStart": ""
   }
