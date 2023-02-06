@@ -1,8 +1,11 @@
 # Pain2Wash
 
-method:
+## TODO
 
-`url: $('#app_uri').val() + '/machine_statuses/' + $('#location').val(),`
+- [ ] Enable Sentry
+- [ ] https://doc.rust-lang.org/stable/std/ops/enum.ControlFlow.html
+
+## Scrape Sequence
 
 ```mermaid
 sequenceDiagram
